@@ -1,0 +1,1 @@
+cd ./backend/user-service & mvn clean install & cd ../calculator-service & mvn clean install & cd ../../.

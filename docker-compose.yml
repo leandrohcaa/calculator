@@ -1,0 +1,99 @@
+version: '3.8'
+services:
+  calculator-db:
+    image: postgres:13
+    container_name: calculator-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_CALCULATOR_DB}
+      POSTGRES_USER: ${POSTGRES_CALCULATOR_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_CALCULATOR_PASSWORD}
+    ports:
+      - "5432:5432"
+    networks:
+      - microservices-network
+    volumes:
+      - calculator_db_data:/var/lib/postgresql/data
+      - ./scripts/init-calculator-db.sql:/docker-entrypoint-initdb.d/init.sql
+  user-db:
+    image: postgres:13
+    container_name: user-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_USER_DB}
+      POSTGRES_USER: ${POSTGRES_USER_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_USER_PASSWORD}
+    ports:
+      - "5433:5432"
+    networks:
+      - microservices-network
+    volumes:
+      - user_db_data:/var/lib/postgresql/data
+      - ./scripts/init-user-db.sql:/docker-entrypoint-initdb.d/init.sql
+  user-service:
+    build:
+      context: ./backend/user-service
+      dockerfile: Dockerfile
+    image: user-service:1.0.0
+    container_name: user-service
+    ports:
+      - "8082:8082"
+    networks:
+      - microservices-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_APPLICATION_NAME=user-service
+      - SERVER_PORT=8082
+      - JWT_SECRET=aSDA@#!#QASDSAEWWQE@!#ASDQ@#
+      - JWT_EXPIRATION=86400000
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://user-db:5432/user_db
+      - SPRING_DATASOURCE_USERNAME=user
+      - SPRING_DATASOURCE_PASSWORD=123456
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
+      - SPRING_JPA_HIBERNATE_DIALECT=org.hibernate.dialect.PostgreSQLDialect
+    depends_on:
+      - user-db
+  calculator-service:
+    build:
+      context: ./backend/calculator-service
+      dockerfile: Dockerfile
+    image: calculator-service:1.0.0
+    container_name: calculator-service
+    ports:
+      - "8081:8081"
+    networks:
+      - microservices-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_APPLICATION_NAME=calculator-service
+      - SERVER_PORT=8081
+      - JWT_SECRET=aSDA@#!#QASDSAEWWQE@!#ASDQ@#
+      - JWT_EXPIRATION=86400000
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://calculator-db:5432/calculator_db
+      - SPRING_DATASOURCE_USERNAME=calculator
+      - SPRING_DATASOURCE_PASSWORD=123456
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
+      - SPRING_JPA_HIBERNATE_DIALECT=org.hibernate.dialect.PostgreSQLDialect
+      - URLS_USER_SERVICE=http://user-service:8082
+    depends_on:
+      - calculator-db
+  calculator-ui:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: calculator-ui
+    ports:
+      - "3001:80"
+    networks:
+      - microservices-network
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      - user-service
+      - calculator-service
+
+volumes:
+  calculator_db_data:
+  user_db_data:
+
+networks:
+  microservices-network:
+    driver: bridge
